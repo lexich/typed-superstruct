@@ -54,13 +54,16 @@ class TObject<
   }
 
   test(t: any): t is T {
-    if (!t) {
+    if (t === null || t === undefined || typeof t !== 'object') {
       return false;
     }
     const keys = Object.keys(this.t);
     for (const k of keys) {
       const prop = this.t[k];
       const v = t[k];
+      if (prop.m === '?' || prop.m === 'r?' && v === undefined)  {
+        continue;
+      }
       if (!prop.test(v)) {
         return false;
       }
