@@ -1,4 +1,4 @@
-import create from './'
+import create, { Validator, TAccessModifiers } from './'
 
 
 describe('test', () => {
@@ -26,7 +26,7 @@ describe('test', () => {
     expect(t).toBe(obj);
   });
 
-  describe('assert', () => {
+  describe('is', () => {
     it('valid', () => {
       const obj = validator.build({
         attributes: {
@@ -36,15 +36,57 @@ describe('test', () => {
         }
       });
 
-      const result = validator.assert(obj);
+      const result = validator.is(obj);
       expect(result).toBe(true);
     });
 
     it('invalid', () => {
-      const result = validator.assert({ message: 'invalid'});
+      const result = validator.is({ message: 'invalid'});
       expect(result).toBe(false);
     });
   });
+
+  describe('assert', () => {
+    it('valid', () => {
+      const obj = validator.build({
+        attributes: {
+          text: 'text',
+          bool: true,
+          textOrNumber: 1,
+        }
+      });
+      expect(() => validator.assert(obj)).not.toThrowError();
+    });
+
+    it('invalid', () => {
+      const obj = { attributes: { message: 'invalid' }};
+      expect(() => validator.assert(obj)).toThrowError('attributes.text');
+    });
+  });
+
+  describe('Custom validator', () => {
+    type TUUID = `${number}-${number}-${number}-${number}`;
+    class UUID<M extends TAccessModifiers> extends Validator<TUUID, M> {
+      test(t: any): t is TUUID {
+        return /^\d{4}-\d{4}-\d{4}-\d{4}$/.test(t);
+      }
+    }
+
+    const validator = create(t => t.object({
+      uuid: new UUID()
+    }));
+
+    it('test object with uuid', () => {
+      const obj = validator.build({
+        uuid: '1234-1234-1234-1234'
+      });
+      expect(validator.is(obj)).toBe(true);
+    });
+
+    it('invalid test', () => {
+      expect(validator.is({})).toBe(false);
+    });
+  })
 });
 
 

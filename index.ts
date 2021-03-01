@@ -1,8 +1,10 @@
 export type TAccessModifiers = undefined | 'r' | '?' | 'r?';
-
+export interface IStack {
+  error(key: string, validator: Validator<any, any>): void;
+}
 export abstract class Validator<T, M extends TAccessModifiers> {
-  constructor(public readonly m: M) {}
-  abstract test(t: any): t is T;
+  constructor(public readonly m?: M) {}
+  abstract test(t: any, ctx?: IStack): t is T;
 }
 
 class TCompose<T1, T2, M extends TAccessModifiers> extends Validator<T1 | T2, M> {
@@ -10,8 +12,8 @@ class TCompose<T1, T2, M extends TAccessModifiers> extends Validator<T1 | T2, M>
     super(m);
   }
 
-  test(t: any): t is T1 & T2 {
-    return this.t1.test(t) || this.t2.test(t);
+  test(t: any, ctx: IStack): t is T1 & T2 {
+    return this.t1.test(t, ctx) || this.t2.test(t, ctx);
   }
 }
 
@@ -53,7 +55,7 @@ class TObject<
     super(m);
   }
 
-  test(t: any): t is T {
+  test(t: any, ctx?: IStack): t is T {
     if (t === null || t === undefined || typeof t !== 'object') {
       return false;
     }
@@ -64,7 +66,8 @@ class TObject<
       if (prop.m === '?' || prop.m === 'r?' && v === undefined)  {
         continue;
       }
-      if (!prop.test(v)) {
+      if (!prop.test(v, ctx)) {
+        ctx?.error(k, prop);
         return false;
       }
     }
@@ -110,31 +113,31 @@ const QuickMethods = {
   ): Validator<A1 | A2, M> {
     const t1 = a1(m);
     const t2 = a2(m);
-    return new TCompose<A1, A2, M>(t1, t2, m!);
+    return new TCompose<A1, A2, M>(t1, t2, m);
   },
 
   string<M extends TAccessModifiers>(m?: M): TString<M> {
-    return new TString<M>(m!);
+    return new TString<M>(m);
   },
 
   object<T extends Record<string, Validator<any, TAccessModifiers>>, M extends TAccessModifiers>(
     t: T,
     m?: M,
   ): TObject<T, M> {
-    return new TObject<T, M>(t, m!);
+    return new TObject<T, M>(t, m);
   },
 
   number<M extends TAccessModifiers>(m?: M): TNumber<M> {
-    return new TNumber<M>(m!);
+    return new TNumber<M>(m);
   },
   boolean<M extends TAccessModifiers>(m?: M): TBoolean<M> {
-    return new TBoolean<M>(m!);
+    return new TBoolean<M>(m);
   },
   null<M extends TAccessModifiers>(m?: M): TNull<M> {
-    return new TNull<M>(m!);
+    return new TNull<M>(m);
   },
   undefined<M extends TAccessModifiers>(m?: M): TUndefined<M> {
-    return new TUndefined<M>(m!);
+    return new TUndefined<M>(m);
   },
 };
 
@@ -143,19 +146,27 @@ export default function create<T extends Validator<any, TAccessModifiers>>(
 ) {
   const t = fn(QuickMethods);
   type TType = Ex<typeof t>;
-  const build: (t: TType) => TType = t => t;
-  const assert = (obj: any, ThrowMessage?: string | ErrorConstructor) => {
-    if (!t.test(obj)) {
-      if (!ThrowMessage) {
-        return false;
-      }
-      if (typeof ThrowMessage === 'string') {
-        throw new Error(ThrowMessage);
-      } else {
-        throw new ThrowMessage('validation fail');
+  function build(t: TType): TType {
+    return t;
+  }
+  function is(obj: any, ctx?: IStack): obj is TType {
+    return t.test(obj, ctx);
+  }
+  function assert(obj: any, ThrowMessage: ErrorConstructor = Error) {
+    let errors: string[];
+    const ctx: IStack = {
+      error(key: string) {
+        if (!errors) {
+          errors = [key];
+        } else {
+          errors.push(key);
+        }
       }
     }
-    return true;
+    if (!is(obj, ctx)) {
+      const path = errors.reverse().join('.')
+      throw new ThrowMessage(path);
+    }
   };
-  return { build, assert };
+  return { build, assert, is };
 }
