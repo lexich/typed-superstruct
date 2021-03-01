@@ -71,10 +71,15 @@ describe('test', () => {
         return /^\d{4}-\d{4}-\d{4}-\d{4}$/.test(t);
       }
     }
+    const tinterface = {
+      uuid<M extends TAccessModifiers>(m?: M) {
+        return new UUID(m);
+      }
+    };
 
     const validator = create(t => t.object({
-      uuid: new UUID()
-    }));
+      uuid: t.uuid()
+    }), tinterface);
 
     it('test object with uuid', () => {
       const obj = validator.build({

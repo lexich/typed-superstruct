@@ -141,10 +141,11 @@ const QuickMethods = {
   },
 };
 
-export default function create<T extends Validator<any, TAccessModifiers>>(
-  fn: (t: typeof QuickMethods) => T,
+export default function create<T extends Validator<any, TAccessModifiers>, TInterface = {}>(
+  fn: (t: typeof QuickMethods & TInterface) => T,
+  tinterface?: TInterface
 ) {
-  const t = fn(QuickMethods);
+  const t = fn({...QuickMethods, ...tinterface});
   type TType = Ex<typeof t>;
   function build(t: TType): TType {
     return t;
